@@ -10,7 +10,7 @@ from lxml import html
 
 protocol = 'http://'
 site = 'live-rutor.org'
-postfix = '/movies/%s/2/'
+postfix = '/browse/%s/0/0/0/'
 
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:45.0) Gecko/20100101 Firefox/45.0'}
 
@@ -55,6 +55,12 @@ def parse_film(link):
         td_el = html.fromstring(td_text)
         try:
             links = td_el.xpath("//a")
+            kp = ""
+            kp_text = ""
+            kp_site = ""
+            kp_vote = ""
+            imbb = ""
+            imbb_vote = ""
             for l in links:
                 link_text = html.tostring(l)
 
@@ -76,32 +82,31 @@ def parse_film(link):
                     except Exception: imbb_vote = ''
                     break
                 
-        except: 
-                print "kp.error" 
+        except: print "[ERROR]: ", link, h1, sys.exc_info()[0]
         buf = html.tostring(table_detail).replace('<br>', '\n').replace('<tr>', '\n')
         desc = html.fromstring(buf).text_content().replace('\'', '\\\'').replace('\"', '').encode('utf-8','ignore')
         #print desc   
         sql_insert = 'INSERT OR REPLACE INTO movie VALUES ({0}, "{1}", "{2}", "{3}", "{4}", "{5}", "{6}", "{7}", "{8}", "{9}")'.format(rutor_id,  h1 + " [{0}]".format(kp), desc,  magnet_link,  torrent_link,  kp_text,  kp,  kp_vote,  imbb,  imbb_vote)
         #sql_insert = 'INSERT OR REPLACE INTO movie VALUES ({0}, "{1}", "{2}", "{3}", "{4}", "{5}", "{6}", "{7}", "{8}", "{9}")'.format("0",  "", "",  "",  "",  "",  "",  "",  "",  "")
         cur.execute(sql_insert)
-        print "[DEBUG]: {0}".format(h1 + " [{0}]".format(kp))
+        #print "[DEBUG]: {0}".format(h1 + " [{0}]".format(kp))
         conn.commit()
     except : 
-        print "[ERROR]: ", h1, sys.exc_info()[0]
+        print "[ERROR]: ", link, h1, sys.exc_info()[0]
         return None
     
 def parse_list_page(cnt):
     tree = html.fromstring(cnt, None, parser=html.HTMLParser(encoding='utf-8'))
-    ul = tree.xpath("//div[@id='index ']")[0] # get first ul element
-    ul_text = html.tostring(ul)  # get text ul element
-    ul_tree = html.fromstring(ul_text)  
-    lis = ul_tree.xpath('//li')
-    for lie in lis:
-        li = html.fromstring(html.tostring(lie))
-        a = li.xpath("//a/@href")        
-        if len(a) > 0:
-            print protocol + site + a[0]
-            last = protocol + site + a[0]
+    div_e = tree.xpath("//div[@id='index']")[0] # get first ul element
+    div_text = html.tostring(div_e)  # get text ul element
+    div_tree = html.fromstring(div_text)  
+    list = div_tree.xpath('//tr')
+    for item in list:
+        item_e = html.fromstring(html.tostring(item))
+        a = item_e.xpath("//a/@href")        
+        if len(a) > 1:
+            splited = a[1]
+            last = protocol + site + splited
             parse_film(last)
         #time.sleep(random.randint(1,3))
     return None
@@ -115,13 +120,13 @@ try:
     cur.execute('CREATE TABLE IF NOT EXISTS movie (movieid INTEGER PRIMARY KEY, name TEXT, desc TEXT, magnet TEXT, torrent TEXT, kp_link TEXT, kp TEXT, kp_vote TEXT, imbb text, imbb_vote TEXT);')
      
      
-    #url = 'http://live-rutor.org/torrent/551439/'
+    #url = 'http://live-rutor.org/torrent/551787/'
     #parse_film(url)
     #exit(0)  
 
     # Нужно в цикле перебрать странички 
-    i = 1
-    while i <= 120:
+    i = 11
+    while i <= 20:
         url = protocol + site + postfix % i
         print url
         cnt = get_content(url)
@@ -129,8 +134,9 @@ try:
         conn.commit()
         #time.sleep(random.randint(1, 3))
         i = i + 1
-finally: conn.close() 
-
+finally: 
+    conn.close() 
+    print "was fulfilled"
 #print magnet_link
 #print protocol + site + torrent_link
 #print HTMLencode(html.tostring(table_detail))
